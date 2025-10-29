@@ -34,4 +34,8 @@ Route::middleware(['auth'])->group(function () {
 
     // TAMBAHKAN BARIS INI
     Route::delete('/devices/{device}', [DeviceController::class, 'destroy'])->name('devices.destroy');
+
+    // TAMBAHKAN DUA BARIS INI:
+    Route::get('/devices/{device}/edit', [DeviceController::class, 'edit'])->name('devices.edit');
+    Route::patch('/devices/{device}', [DeviceController::class, 'update'])->name('devices.update');
 });
