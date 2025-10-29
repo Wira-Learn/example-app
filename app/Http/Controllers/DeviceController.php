@@ -3,21 +3,17 @@
 namespace App\Http\Controllers;
 
 use App\Models\Device;
-use App\Services\MqttBrokerService; // <-- 1. IMPORT SERVICE BARU
+use App\Services\MqttBrokerService; // <-- Sudah ada
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-// Hapus 'Process' dan 'File' karena sudah tidak dipakai di sini
 use Illuminate\Support\Str;
-// Kita akan butuh DB untuk Poin 4 (Transactions)
-use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\DB; // <-- Sudah ada
+use Illuminate\Support\Facades\Process; // <-- 1. TAMBAHKAN IMPORT INI
 
 class DeviceController extends Controller
 {
-    // 2. Buat properti untuk menyimpan service
     protected MqttBrokerService $brokerService;
 
-    // 3. Gunakan constructor injection untuk memasukkan service
-    // Laravel akan otomatis membuatkan MqttBrokerService untuk kita
     public function __construct(MqttBrokerService $brokerService)
     {
         $this->brokerService = $brokerService;
@@ -28,20 +24,20 @@ class DeviceController extends Controller
      */
     public function index()
     {
-        //
+        // Arahkan saja ke dashboard, karena daftar device ada di sana
+        return redirect()->route('dashboard');
     }
 
     /**
      * Show the form for creating a new resource.
+     * 2. TAMBAHKAN METHOD 'create' INI
      */
     public function create()
     {
-        //
+        // Tampilkan view 'create.blade.php' yang tadi kita buat
+        return view('create');
     }
 
-    /**
-     * Menyimpan perangkat baru dan memprovisinya di Mosquitto.
-     */
     /**
      * Menyimpan perangkat baru dan memprovisinya di Mosquitto.
      */
@@ -60,8 +56,6 @@ class DeviceController extends Controller
 
         try {
             // --- MULAI TRANSAKSI ---
-            // Kita bungkus semua logika kritis dalam satu transaksi.
-            // Variabel $device perlu di-pass dengan 'use' agar bisa diakses di luar scope closure.
             $device = DB::transaction(function () use ($user, $deviceName, $mqtt_username, $mqtt_password) {
 
                 // 2. Simpan ke Database
@@ -72,8 +66,6 @@ class DeviceController extends Controller
                 ]);
 
                 // 3. Panggil service untuk melakukan provisi
-                // Jika ini gagal, Exception akan dilempar, dan
-                // DB::transaction() akan otomatis me-rollback Device::create() di atas.
                 $this->brokerService->provisionDevice($newDevice, $mqtt_password);
 
                 return $newDevice; // Kembalikan device yang baru dibuat
@@ -82,9 +74,6 @@ class DeviceController extends Controller
 
         } catch (\Exception $e) {
             // 4. Penanganan Gagal
-            // Kita tidak perlu $device->delete() lagi, karena rollback sudah otomatis!
-
-            // Tampilkan error (lebih aman di production)
             $errorMessage = env('APP_DEBUG') ? $e->getMessage() : 'Terjadi kesalahan pada server.';
             return back()->with('error', 'Gagal memprovisi perangkat: ' . $errorMessage);
         }
@@ -106,13 +95,13 @@ class DeviceController extends Controller
      */
     public function show(string $id)
     {
-        //
+        // Tidak kita gunakan saat ini, bisa diabaikan
     }
 
     /**
      * Show the form for editing the specified resource.
      */
-    public function edit(Device $device) // <-- Ubah parameter dari string $id
+    public function edit(Device $device)
     {
         // Otorisasi: Pastikan pengguna hanya mengedit perangkat miliknya
         if ($device->user_id !== auth()->id()) {
@@ -120,26 +109,26 @@ class DeviceController extends Controller
         }
 
         // Tampilkan view 'edit' dan kirim data perangkat
+        // (Nama view-nya kita ganti jadi 'devices.edit' agar rapi)
         return view('devices.edit', compact('device'));
     }
 
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Device $device) // <-- Ubah parameter dari string $id
+    public function update(Request $request, Device $device)
     {
         // 1. Otorisasi
         if ($device->user_id !== auth()->id()) {
             abort(403, 'TINDAKAN TIDAK DIIZINKAN');
         }
 
-        // 2. Validasi (Sama seperti Poin 7, tapi kita lakukan sekarang)
+        // 2. Validasi
         $validated = $request->validate([
             'name' => 'required|string|max:255',
         ]);
 
         // 3. Update Database
-        // Kita hanya update nama, tidak update kredensial MQTT
         $device->update($validated);
 
         // 4. Redirect kembali ke dashboard
@@ -166,15 +155,12 @@ class DeviceController extends Controller
                 $device->delete();
 
                 // 3. Panggil service untuk menghapus provisi
-                // Jika ini gagal, Exception akan dilempar, dan
-                // DB::transaction() akan otomatis me-rollback $device->delete().
                 $this->brokerService->deprovisionDevice($device);
             });
             // --- SELESAI TRANSAKSI (COMMIT) ---
 
         } catch (\Exception $e) {
             // 4. Penanganan Gagal
-            // Rollback sudah otomatis terjadi.
             $errorMessage = env('APP_DEBUG') ? $e->getMessage() : 'Terjadi kesalahan pada server.';
             return redirect()->route('dashboard')
                 ->with('error', 'Gagal menghapus perangkat: ' . $errorMessage);
@@ -187,11 +173,91 @@ class DeviceController extends Controller
 
 
     /**
-     * 5. HAPUS FUNGSI regenerateAclFile() DARI SINI
+     * 3. TAMBAHKAN METHOD 'publishMessage' BARU INI
      *
-     * private function regenerateAclFile() { ... }
-     *
-     * Fungsi ini sudah tidak ada lagi di controller.
-     * Tugasnya sudah diambil alih oleh MqttBrokerService.
+     * Mem-publish pesan MQTT menggunakan mosquitto_pub.
+     * Ini adalah cara sederhana tanpa library MQTT client di PHP.
      */
+    public function publishMessage(Request $request)
+    {
+        $validated = $request->validate([
+            'topic' => 'required|string|max:255',
+            'message' => 'required|string|max:255',
+        ]);
+
+        // Ambil info broker dari config
+        $brokerHost = config('mqtt.broker_host');
+        $brokerPort = config('mqtt.port_unsecure');
+
+        // Ambil username dan password dari salah satu device milik user
+        // Ini HANYA untuk OTORISASI publish.
+        // Asumsinya, user boleh publish ke topic mana saja setelah login.
+        // Jika Anda ingin membatasi, logikanya harus lebih kompleks.
+        $device = Auth::user()->devices()->first();
+
+        // Jika user tidak punya device, dia tidak bisa publish
+        if (!$device) {
+            return back()->with('mqtt_error', 'Anda harus memiliki setidaknya satu perangkat untuk mem-publish pesan.');
+        }
+
+        // Kita perlu mengambil password asli. 
+        // Password tidak disimpan di DB, jadi kita tidak bisa mengambilnya.
+        //
+        // =================================================================
+        // !! PERHATIAN !!
+        // =================================================================
+        // Kode di MqttBrokerService menggunakan `mosquitto_passwd` yang
+        // mengenkripsi password. Kita tidak bisa mengambil password aslinya
+        // dari database (karena memang tidak disimpan).
+        //
+        // Solusi Sederhana (Untuk Saat Ini):
+        // Kita asumsikan broker Mosquitto Anda mengizinkan koneksi dari localhost
+        // tanpa autentikasi (misalnya allow_anonymous true), atau Anda memiliki
+        // satu user khusus 'admin_panel' untuk publish.
+        //
+        // Solusi Sebenarnya (Lebih Rumit):
+        // 1. Menggunakan library PHP MQTT Client (seperti php-mqtt/client)
+        // 2. Menyimpan password device di database (TIDAK DISARANKAN)
+        // 3. Mengubah MqttBrokerService agar menyimpan password mentah 
+        //    sementara di cache/session saat device dibuat.
+        //
+        // Mari kita gunakan Solusi Sederhana untuk sekarang:
+        // Kita akan publish TANPA username/password, dengan asumsi 
+        // koneksi dari localhost (tempat web server berjalan) diizinkan.
+        // =================================================================
+
+        try {
+            // Perintah mosquitto_pub sederhana tanpa autentikasi
+            $command = [
+                'mosquitto_pub',
+                '-h',
+                $brokerHost,
+                '-p',
+                $brokerPort,
+                '-t',
+                $validated['topic'],
+                '-m',
+                $validated['message'],
+                '-r', // Menandakan pesan sebagai 'retained'
+            ];
+
+            // Jika Anda punya user khusus untuk panel ini, tambahkan:
+            // $command[] = '-u';
+            // $command[] = 'username_panel';
+            // $command[] = '-P';
+            // $command[] = 'password_panel';
+
+            // Jalankan proses
+            $result = Process::run($command);
+
+            if ($result->successful()) {
+                return back()->with('mqtt_success', 'Pesan berhasil di-publish!');
+            } else {
+                // Tampilkan error jika gagal
+                return back()->with('mqtt_error', 'Gagal publish pesan: ' . $result->errorOutput());
+            }
+        } catch (\Exception $e) {
+            return back()->with('mqtt_error', 'Gagal menjalankan perintah publish: ' . $e->getMessage());
+        }
+    }
 }
