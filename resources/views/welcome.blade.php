@@ -13,17 +13,17 @@
         <p>Silakan login atau register untuk melanjutkan.</p>
 
         @if (Route::has('login'))
-        <div>
-            @auth
-            <a href="{{ url('/dashboard') }}">Ke Dashboard</a>
-            @else
-            <a href="{{ route('login.show') }}">Login</a>
-            <br><br>
-            @if (Route::has('register.show'))
-            <a href="{{ route('register.show') }}">Register</a>
-            @endif
-            @endauth
-        </div>
+            <div>
+                @auth
+                    <a href="{{ url('/dashboard') }}">Ke Dashboard</a>
+                @else
+                    <a href="{{ route('login.show') }}">Login</a>
+                    <br><br>
+                    @if (Route::has('register.show'))
+                        <a href="{{ route('register.show') }}">Register</a>
+                    @endif
+                @endauth
+            </div>
         @endif
 
     </div>

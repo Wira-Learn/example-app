@@ -12,14 +12,14 @@
     <h1>Halaman Login</h1>
 
     @if ($errors->any())
-    <div style="color: red;">
-        <strong>Whoops! Ada masalah dengan input Anda.</strong>
-        <ul>
-            @foreach ($errors->all() as $error)
-            <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
+        <div style="color: red;">
+            <strong>Whoops! Ada masalah dengan input Anda.</strong>
+            <ul>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+        </div>
     @endif
 
     <form method="POST" action="{{ route('login.submit') }}">

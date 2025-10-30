@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Services;
 
 use App\Models\Device;
@@ -19,7 +18,7 @@ class MqttBrokerService
     {
         // Ambil path dari file konfigurasi yang kita buat di Poin 2
         $this->passwordFile = config('mqtt.mosquitto.password_file');
-        $this->aclFile = config('mqtt.mosquitto.acl_file');
+        $this->aclFile      = config('mqtt.mosquitto.acl_file');
     }
 
     /**
@@ -88,7 +87,8 @@ class MqttBrokerService
         Process::run("sudo tee {$this->aclFile} < {$tempFilePath}")->throw();
 
         // Setel kepemilikan yang benar
-        Process::run("sudo chown mosquitto:mosquitto {$this->aclFile}")->throw();
+        // Process::run("sudo chown mosquitto:mosquitto {$this->aclFile}")->throw();
+        Process::run("sudo /usr/local/bin/chown_acl_mosquitto.sh")->throw();
 
         // Hapus file sementara
         File::delete($tempFilePath);

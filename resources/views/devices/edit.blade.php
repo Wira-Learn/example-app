@@ -29,10 +29,11 @@
     <form method="POST" action="{{ route('devices.update', $device) }}">
         @csrf @method('PATCH') <div>
             <label for="name">Nama Perangkat:</label><br>
-            <input type="text" id="name" name="name" value="{{ old('name', $device->name) }}" required autofocus>
+            <input type="text" id="name" name="name" value="{{ old('name', $device->name) }}" required
+                autofocus>
 
             @error('name')
-            <p style="color: red;">{{ $message }}</p>
+                <p style="color: red;">{{ $message }}</p>
             @enderror
         </div>
 

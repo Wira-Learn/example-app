@@ -23,7 +23,8 @@
     <hr>
 
     <h1>Buat Perangkat Baru</h1>
-    <p>Masukkan nama yang mudah diingat untuk perangkat baru Anda (misalnya: "Sensor Suhu Kamar" atau "Lampu Garasi").</p>
+    <p>Masukkan nama yang mudah diingat untuk perangkat baru Anda (misalnya: "Sensor Suhu Kamar" atau "Lampu Garasi").
+    </p>
 
     <hr>
 
@@ -35,7 +36,7 @@
             <input type="text" id="name" name="name" value="{{ old('name') }}" required autofocus>
 
             @error('name')
-            <p style="color: red;">{{ $message }}</p>
+                <p style="color: red;">{{ $message }}</p>
             @enderror
         </div>
 

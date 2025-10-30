@@ -1,15 +1,14 @@
 <?php
-
 namespace App\Http\Controllers;
 
 use App\Models\Device;
 use App\Services\MqttBrokerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log; // <-- 1. TAMBAHKAN IMPORT INI
-use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process; // <-- 1. TAMBAHKAN IMPORT INI
+use Illuminate\Support\Str;
 
 class DeviceController extends Controller
 {
@@ -45,10 +44,10 @@ class DeviceController extends Controller
             'name' => 'required|string|max:255',
         ]);
 
-        $user = Auth::user();
+        $user          = Auth::user();
         $mqtt_username = 'user_' . $user->id . '_dev_' . Str::random(8);
         $mqtt_password = Str::random(16);
-        $deviceName = $request->name;
+        $deviceName    = $request->name;
 
         // =================================================================
         // !! PERINGATAN WAJIB: KONFIGURASI SUDOERS !!
@@ -68,8 +67,8 @@ class DeviceController extends Controller
         try {
             $device = DB::transaction(function () use ($user, $deviceName, $mqtt_username, $mqtt_password) {
                 $newDevice = Device::create([
-                    'user_id' => $user->id,
-                    'name' => $deviceName,
+                    'user_id'       => $user->id,
+                    'name'          => $deviceName,
                     'mqtt_username' => $mqtt_username,
                 ]);
 
@@ -81,7 +80,7 @@ class DeviceController extends Controller
         } catch (\Illuminate\Process\Exceptions\ProcessFailedException $e) {
             // Ini adalah error jika perintah `sudo` gagal
             Log::error("GAGAL PROVISI DEVICE (PERIKSA SUDOERS!): " . $e->getMessage(), [
-                'command' => $e->result->command(),
+                'command'      => $e->result->command(),
                 'error_output' => $e->result->errorOutput(),
             ]);
             return back()->with('error', 'Gagal memprovisi perangkat di broker MQTT. Periksa log server. Kemungkinan besar ini adalah masalah izin `sudo` untuk user web server.');
@@ -96,9 +95,9 @@ class DeviceController extends Controller
         return redirect()->route('dashboard')
             ->with('success', 'Perangkat berhasil dibuat!')
             ->with('new_device_credentials', [
-                'name' => $device->name,
-                'username' => $mqtt_username,
-                'password' => $mqtt_password,
+                'name'          => $device->name,
+                'username'      => $mqtt_username,
+                'password'      => $mqtt_password,
                 'publish_topic' => "{$mqtt_username}/data/out",
                 'subscribe_topic' => "{$mqtt_username}/cmd/in",
             ]);
@@ -169,7 +168,7 @@ class DeviceController extends Controller
             });
         } catch (\Illuminate\Process\Exceptions\ProcessFailedException $e) {
             Log::error("GAGAL DEPROVISI DEVICE (PERIKSA SUDOERS!): " . $e->getMessage(), [
-                'command' => $e->result->command(),
+                'command'      => $e->result->command(),
                 'error_output' => $e->result->errorOutput(),
             ]);
             return redirect()->route('dashboard')
@@ -185,14 +184,13 @@ class DeviceController extends Controller
             ->with('success', "Perangkat '{$deviceName}' berhasil dihapus dari database dan broker MQTT.");
     }
 
-
     /**
      * Mem-publish pesan MQTT menggunakan mosquitto_pub.
      */
     public function publishMessage(Request $request)
     {
         $validated = $request->validate([
-            'topic' => 'required|string|max:255',
+            'topic'   => 'required|string|max:255',
             'message' => 'required|string|max:255',
         ]);
 
